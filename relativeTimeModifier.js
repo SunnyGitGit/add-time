@@ -1,12 +1,14 @@
 function relativeTimeModifier(expression) {
-    const regEx = /^now\(\)((\+(\d+)(mon|s|m|h|d|y))*)$/;
+    const regEx = /^now\(\)(([+-](\d+)(mon|s|m|h|d|y))*)(\@(mon|s|m|h|d|y))?$/;
     const match = expression.match(regEx);
   
     if (!match) {
-      throw new Error("Invalid format. Expected format: now() with optional + (e.g., now()+3d)");
+      throw new Error("Invalid format. Expected format: now() with optional + (e.g., now()+3d-2m@h)");
     }
     
-    const operations = [...expression.matchAll(/\+(\d+)(mon|s|m|h|d|y)/g)];
+    const operations = [...expression.matchAll(/([+-])(\d+)(mon|s|m|h|d|y)/g)];
+    const snapMatch = expression.match(/\@(mon|s|m|h|d|y)/);
+    const snapUnit = snapMatch? snapMatch[1] : null;
   
     const now = new Date();
     const utcDate = new Date(Date.UTC(
@@ -19,8 +21,8 @@ function relativeTimeModifier(expression) {
       now.getUTCMilliseconds()
     ));
   
-    operations.forEach(([, amountStr, unit]) =>  {
-      const amount = parseInt(amountStr);
+    operations.forEach(([, sign , amountStr, unit]) =>  {
+      const amount = parseInt(amountStr, 10)*(sign ==='-'? -1:1);
     
       switch (unit) {
         case 's':
@@ -45,6 +47,34 @@ function relativeTimeModifier(expression) {
           throw new Error("Unsupported time unit.");
       }
     });
+    
+
+    if (snapUnit) {
+      switch (snapUnit) {
+        case 's':
+          utcDate.setUTCMilliseconds(0);
+          break;
+        case 'm':
+          utcDate.setUTCSeconds(0,0);
+          break;
+        case 'h':
+          utcDate.setUTCMinutes(0,0,0);
+          break;
+        case 'd':
+          utcDate.setUTCHours(0,0,0,0);
+          break;
+        case 'mon':
+          utcDate.setUTCDate(1);
+          utcDate.setUTCHours(0,0,0,0);
+          break;
+        case 'y':
+          utcDate.setUTCMonth(0,1);
+          utcDate.setUTCHours(0,0,0,0);
+          break;
+        default:
+          throw new Error("Unsupported snap unit.");
+      }
+    }
     
     return utcDate;
   }
